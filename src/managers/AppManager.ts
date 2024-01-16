@@ -8,6 +8,7 @@ import {
 } from '../interfaces/interfaces'
 import {EventEmitter} from "node:events";
 import {eventEmitter} from "../utils";
+import {responses} from "../responses/responses";
 
 interface IDataUser {
   param: IParam
@@ -29,25 +30,11 @@ export class AppManager implements IService<IParam> {
   private dbManager: DbManager
 
   private userService: IService<IParam>
-  private dragService: IService<IParam>
 
   private eventEmmitter: EventEmitter
 
   private readonly functionalMap: IFunctionalArgMap<IDataUser>
   private readonly services: IFunctionalArgMap<IParam>
-
-  private noService = {
-    code: 400,
-    message: `The service must be defined`,
-  }
-  private noSection = {
-    code: 400,
-    message: `The section must be defined`,
-  }
-  private accessDenied = {
-    code: 403,
-    message: `Access denied`,
-  };
 
   constructor(config: IArg) {
     this.logManager = config.logManager
@@ -62,14 +49,8 @@ export class AppManager implements IService<IParam> {
       logManager: this.logManager
     })
 
-    this.dragService = DragService.getInstance({
-      dbManager: this.dbManager,
-      logManager: this.logManager
-    })
-
     this.services = {
-      users: this.userService.call,
-      drags: this.dragService.call,
+      users: this.userService.call
     }
 
     this.functionalMap = {
@@ -104,25 +85,23 @@ export class AppManager implements IService<IParam> {
   }
 
   private addConfig = async (args: IDataUser) => {
-    this.logManager.log2Console('add', args.param)
     const param = args.param
-    if (param.service == undefined) return this.noService
-    if (param.keyFunc == undefined) return this.noSection
+    if (param.service == undefined) return responses.noService
+    if (param.keyFunc == undefined) return responses.noSection
 
     return await this.services[param.service](param)
   }
 
   private deleteConfig = async (args: IDataUser) => {
-    this.logManager.log2Console('delete', args.param)
     const param = args.param
-    if (param.service == undefined) return this.noService
-    if (param.keyFunc == undefined) return this.noSection
+    if (param.service == undefined) return responses.noService
+    if (param.keyFunc == undefined) return responses.noSection
 
     return await this.services[param.service](param)
   }
   private getConfig = async (args: IDataUser) => {
     const param = args.param
-    if (args.user == undefined) return this.accessDenied
+    if (args.user == undefined) return responses.accessDenied
     const config = <{ [key: string]: any }>{}
 
     if (param.service) return await this.services[param.service](param)
@@ -143,10 +122,9 @@ export class AppManager implements IService<IParam> {
     return config
   }
   private setConfig = async (args: IDataUser) => {
-    this.logManager.log2Console('set', args.param)
     const param = args.param
-    if (param.service == undefined) return this.noService
-    if (param.keyFunc == undefined) return this.noSection
+    if (param.service == undefined) return responses.noService
+    if (param.keyFunc == undefined) return responses.noSection
 
     return await this.services[param.service](param)
   }
@@ -154,8 +132,8 @@ export class AppManager implements IService<IParam> {
 
   private exec = async (args: IDataUser): Promise<any> => {
     const param = args.param
-    if (param.service == undefined) return this.noService
-    if (param.keyFunc == undefined) return this.noSection
+    if (param.service == undefined) return responses.noService
+    if (param.keyFunc == undefined) return responses.noSection
 
     if (args.user == undefined && param.keyFunc == 'userExists') {
       return await this.services['users'](param)
@@ -166,9 +144,8 @@ export class AppManager implements IService<IParam> {
 
 
   private getData = async (args: IDataUser) => {
-    const globalIgnore = ['journal', 'control']
     const param = args.param
-    if (args.user == undefined) return this.accessDenied
+    if (args.user == undefined) return responses.accessDenied
     const data = <{ [key: string]: any }>{}
 
     if (param.service) return await this.services[param.service!](param)
@@ -176,7 +153,6 @@ export class AppManager implements IService<IParam> {
     //Собираем все подряд с учетом прав доступа текущей сессии
     for (let key of Object.keys(this.services)) {
       if (!(<IGroup>args.user.acl!).read.includes(key)) continue
-      if (globalIgnore.includes(key)) continue
 
       data[key] = await this.services[key](param)
     }
@@ -188,10 +164,7 @@ export class AppManager implements IService<IParam> {
 
   public call = async (data: IParam, user?: IUser) => {
     if (!(data.appFunc! in this.functionalMap)) {
-      throw {
-        code: 404,
-        message: `Function ${data.appFunc} not found`,
-      }
+      throw responses.funcNotFound
     }
     const response = await this.functionalMap[data.appFunc!](<IDataUser>{
       user,
@@ -201,8 +174,7 @@ export class AppManager implements IService<IParam> {
       return response
     }
     return {
-      code: 200,
-      message: 'Ok',
+      ...responses.ok,
       data: response
     }
   }

@@ -1,3 +1,6 @@
 [submodule "src/modules/constants"]
 	path = src/modules/constants
 	url = https://github.com/saffarid/profile-constants.git
+[submodule "src/modules/database-wrapper"]
+	path = src/modules/database-wrapper
+	url = https://github.com/saffarid/ts-database-wrapper.git
